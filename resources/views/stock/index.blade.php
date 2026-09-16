@@ -513,7 +513,7 @@
                 ({{ strtoupper($logCategory ?? 'ITEM') }}@if($logSize), Size {{ $logSize }}@endif @if($logNwt), NWT {{ number_format((float) $logNwt, 2) }} kg @endif)
               </span>
             @endif
-            @if($log->note) — <span style="color:#aaa">{{ $log->note }}</span>@endif
+            @if($log->note) — <span class="log-note-text" style="color:#f1f5f9;font-weight:500;">{{ $log->note }}</span>@endif
           </div>
           <div class="log-time">🕐 {{ $log->logged_at->format('d M Y, h:i:s A') }}</div>
         </div>
@@ -571,6 +571,31 @@
       <div class="modal-btns">
         <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn-submit">Add Item</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Item Modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <h2 style="color:#ef4444;display:flex;align-items:center;gap:8px;">
+      <span>🗑️</span> Delete Stock Item
+    </h2>
+    <p id="deleteItemPromptText" style="color:#444;font-size:13px;margin-bottom:14px;line-height:1.5;">
+      Are you sure you want to delete this item?
+    </p>
+    <form id="deleteStockForm">
+      <div class="form-group">
+        <label for="deleteNoteInput" style="display:block;font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">
+          Note / Reason for deletion <span style="color:#ef4444">*</span>
+        </label>
+        <textarea id="deleteNoteInput" rows="3" placeholder="Enter reason or note (e.g. Dispatched to customer, Damaged, Expired, Stock correction...)" required style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;"></textarea>
+        <div id="deleteNoteError" class="error-msg" style="display:none;color:#ef4444;font-size:11px;margin-top:4px;">Please enter a note / reason before deleting.</div>
+      </div>
+      <div class="modal-btns">
+        <button type="button" class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+        <button type="submit" class="btn-submit" id="confirmDeleteBtn" style="background:#ef4444;">Confirm Delete</button>
       </div>
     </form>
   </div>
@@ -634,6 +659,33 @@ function openModal()  {
 }
 function closeModal() { document.getElementById('addModal').classList.remove('active'); }
 
+// Delete Modal
+let currentDeleteForm = null;
+
+function openDeleteModal(form, bagNo, details = '') {
+  currentDeleteForm = form;
+  const promptEl = document.getElementById('deleteItemPromptText');
+  if (promptEl) {
+    promptEl.innerHTML = `Are you sure you want to delete <strong>Item #${escapeHtml(bagNo)}</strong>${details ? ` <span style="color:#666">(${escapeHtml(details)})</span>` : ''}? Please enter a note for the activity log:`;
+  }
+  const noteInput = document.getElementById('deleteNoteInput');
+  if (noteInput) {
+    noteInput.value = '';
+    const errorEl = document.getElementById('deleteNoteError');
+    if (errorEl) errorEl.style.display = 'none';
+  }
+  document.getElementById('deleteModal').classList.add('active');
+  setTimeout(() => {
+    if (noteInput) noteInput.focus();
+  }, 100);
+}
+
+function closeDeleteModal() {
+  const deleteModal = document.getElementById('deleteModal');
+  if (deleteModal) deleteModal.classList.remove('active');
+  currentDeleteForm = null;
+}
+
 function updateModalLabels() {
   const category = document.getElementById('categorySelect').value;
   const nwtLabel = document.getElementById('nwtLabel');
@@ -664,6 +716,27 @@ document.getElementById('categorySelect').addEventListener('change', updateModal
 
 document.getElementById('addModal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
+});
+
+document.getElementById('deleteModal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeDeleteModal();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (document.getElementById('deleteModal')?.classList.contains('active')) {
+      closeDeleteModal();
+    } else if (document.getElementById('addModal')?.classList.contains('active')) {
+      closeModal();
+    }
+  }
+});
+
+document.getElementById('deleteNoteInput')?.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById('deleteStockForm')?.requestSubmit();
+  }
 });
 
 // Show flash message
@@ -831,51 +904,96 @@ document.addEventListener('submit', function(e) {
   }
 });
 
-// Delete with AJAX
+// Delete with Modal and required Note
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('btn-del')) {
     e.preventDefault();
     
     const form = e.target.closest('form');
-    const url = form.getAttribute('action');
-    const bagNo = form.getAttribute('data-bag-no');
+    if (!form) return;
     
-    if (confirm(`Delete Item #${bagNo}?`)) {
-      const formData = new FormData();
-      formData.append('_token', document.querySelector('meta[name="csrf-token"]').content);
-      formData.append('_method', 'DELETE');
-      
-      fetch(url, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept': 'application/json'
-        }
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          showFlash(data.message, 'success');
-          // Remove row from DOM with animation
-          const row = form.closest('tr');
-          row.style.opacity = '0';
-          row.style.transition = 'opacity 0.3s';
-          
-          // After animation, remove the row and recalculate
-          setTimeout(() => {
-            location.reload();
-          }, 300);
-        } else {
-          showFlash('Error deleting item', 'error');
-        }
-      })
-      .catch(error => {
-        showFlash('An error occurred', 'error');
-        console.error('Error:', error);
-      });
+    const row = form.closest('tr');
+    const bagNo = form.getAttribute('data-bag-no') || row?.getAttribute('data-bag-no') || row?.querySelector('strong')?.textContent.trim() || 'Item';
+    
+    let details = '';
+    if (row) {
+      const cat = row.getAttribute('data-category');
+      const size = row.getAttribute('data-size');
+      const nwt = row.getAttribute('data-nwt');
+      const parts = [];
+      if (cat) parts.push(cat);
+      if (size) parts.push('Size ' + size);
+      if (nwt && parseFloat(nwt) > 0) parts.push('NWT ' + nwt + ' kg');
+      if (parts.length > 0) details = parts.join(', ');
     }
+    
+    openDeleteModal(form, bagNo, details);
   }
+});
+
+document.getElementById('deleteStockForm')?.addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  if (!currentDeleteForm) return;
+  
+  const noteInput = document.getElementById('deleteNoteInput');
+  const note = noteInput ? noteInput.value.trim() : '';
+  const errorEl = document.getElementById('deleteNoteError');
+  
+  if (!note) {
+    if (errorEl) errorEl.style.display = 'block';
+    if (noteInput) noteInput.focus();
+    return;
+  }
+  
+  const submitBtn = document.getElementById('confirmDeleteBtn');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Deleting...';
+  }
+  
+  const url = currentDeleteForm.getAttribute('action');
+  const formData = new FormData();
+  formData.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+  formData.append('_method', 'DELETE');
+  formData.append('note', note);
+  
+  const row = currentDeleteForm.closest('tr');
+  
+  fetch(url, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    closeDeleteModal();
+    if (data.success) {
+      showFlash(data.message, 'success');
+      if (row) {
+        row.style.opacity = '0';
+        row.style.transition = 'opacity 0.3s';
+      }
+      setTimeout(() => {
+        location.reload();
+      }, 300);
+    } else {
+      alert(data.message || 'Error deleting item');
+    }
+  })
+  .catch(error => {
+    alert('An error occurred while deleting the item.');
+    console.error('Error:', error);
+  })
+  .finally(() => {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Confirm Delete';
+    }
+  });
 });
 
 // Update a single row's quantity display and recalculate all totals

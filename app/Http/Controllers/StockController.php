@@ -198,11 +198,19 @@ class StockController extends Controller
         ]);
     }
 
-    public function destroy(Stock $stock)
+    public function destroy(Request $request, Stock $stock)
     {
-        $bagNo = $stock->bag_no;
+        $request->validate([
+            'note' => 'nullable|string|max:500',
+        ]);
 
-        DB::transaction(function () use ($stock) {
+        $bagNo = $stock->bag_no;
+        $note = trim((string) $request->input('note', ''));
+        if ($note === '') {
+            $note = 'Item dispatched / deleted';
+        }
+
+        DB::transaction(function () use ($stock, $note) {
             StockLog::create([
                 'stock_id' => $stock->id,
                 'bag_no' => $stock->bag_no,
@@ -213,17 +221,22 @@ class StockController extends Controller
                 'quantity_changed' => $stock->quantity,
                 'quantity_before' => $stock->quantity,
                 'quantity_after' => 0,
-                'note' => 'Item dispatched / deleted',
+                'note' => $note,
                 'logged_at' => now(),
             ]);
 
             $stock->delete();
         });
 
-        return response()->json([
-            'success' => true,
-            'message' => "Item #{$bagNo} deleted.",
-            'stock_id' => $stock->id,
-        ]);
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Item #{$bagNo} deleted.",
+                'stock_id' => $stock->id,
+                'note' => $note,
+            ]);
+        }
+
+        return redirect()->route('stock.index')->with('success', "Item #{$bagNo} deleted.");
     }
 }
