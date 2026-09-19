@@ -11,7 +11,7 @@
   if($isSqf) $label = 'Square Fit';
 @endphp
 
-<div class="section bag-section" data-stock-size="{{ $size }}" data-full-key="{{ $fullKey }}">
+<div class="section bag-section" data-stock-size="{{ $size }}" data-full-key="{{ $fullKey }}" data-total-unit="{{ $isBnd ? '' : 'kg' }}">
   <div class="section-header" style="background: {{ $color }}">
     <span>{{ $icon }} {{ $size }}</span>
     <div style="display: flex; align-items: center; gap: 10px;">
@@ -58,8 +58,8 @@
     <tfoot>
       <tr class="tfoot-row">
         <td colspan="2">TOTAL</td>
-        <td>{{ number_format($sizeTotal['nwt'],2) }}{{ $isBnd ? '' : ' kg' }}</td>
-        <td>{{ $sizeTotal['bags'] }} items</td>
+        <td data-total-value="true">{{ number_format($sizeTotal['nwt'],2) }}{{ $isBnd ? '' : ' kg' }}</td>
+        <td data-total-items="true">{{ $sizeTotal['bags'] }} items</td>
         @if($canManageStock)<td colspan="2"></td>@endif
       </tr>
     </tfoot>

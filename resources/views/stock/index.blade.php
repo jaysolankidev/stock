@@ -1027,6 +1027,7 @@ function recalculateAllTotals() {
     const firstRow = section.querySelector('tbody tr[data-size]');
     const size = firstRow?.dataset.size;
     if (!size) return;
+    const summaryKey = section.dataset.fullKey || size;
     
     console.log('Processing size:', size);
     
@@ -1056,23 +1057,24 @@ function recalculateAllTotals() {
     });
     
     console.log(`Size ${size}: bags=${totalBags}, nwt=${totalNwt.toFixed(2)}`);
-    totals[size] = { bags: totalBags, nwt: totalNwt };
+    totals[summaryKey] = { bags: totalBags, nwt: totalNwt };
     
     // Update this table's footer
     const footerRow = table.querySelector('tfoot tr');
     if (footerRow && footerRow.cells.length > 0) {
-      // Find and update the NWT cell
-      const nwtFootCell = Array.from(footerRow.cells).find(cell => cell.textContent.includes('kg'));
-      if (nwtFootCell) {
-        nwtFootCell.textContent = totalNwt.toFixed(2) + ' kg';
-        console.log('Updated footer NWT to:', totalNwt.toFixed(2));
+      // Update the total value cell for both NWT (kg) and Bundle sections.
+      const totalValueCell = footerRow.querySelector('[data-total-value]');
+      if (totalValueCell) {
+        const unit = section.dataset.totalUnit ? ' ' + section.dataset.totalUnit : '';
+        totalValueCell.textContent = totalNwt.toFixed(2) + unit;
+        console.log('Updated footer total to:', totalNwt.toFixed(2) + unit);
       }
       
-      // Find and update the bags cell
-      const bagsFootCell = Array.from(footerRow.cells).find(cell => cell.textContent.includes('bags'));
-      if (bagsFootCell) {
-        bagsFootCell.textContent = totalBags + ' bags';
-        console.log('Updated footer bags to:', totalBags);
+      // Update the item count cell.
+      const itemsFootCell = footerRow.querySelector('[data-total-items]');
+      if (itemsFootCell) {
+        itemsFootCell.textContent = totalBags + ' items';
+        console.log('Updated footer items to:', totalBags);
       }
     }
   });

@@ -133,7 +133,7 @@ class StockController extends Controller
             default => 'NWT',
         };
 
-        DB::transaction(function () use ($stock, $newNwt, $oldNwt) {
+        DB::transaction(function () use ($stock, $newNwt, $oldNwt, $valueLabel) {
             $stock->update(['nwt' => $newNwt]);
             
             StockLog::create([
