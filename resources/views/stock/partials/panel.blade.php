@@ -5,6 +5,7 @@
   
   $isBnd = strtoupper($category) === 'BND'; 
   $isSqf = strtoupper($category) === 'SQF';
+  $isEditableValue = in_array(strtoupper($category), ['BAG', 'BND'], true);
   $label = 'NWT (kg)';
   if($isBnd) $label = 'Bundle';
   if($isSqf) $label = 'Square Fit';
@@ -33,7 +34,7 @@
       <tr data-stock-id="{{ $s->id }}" data-bag-no="{{ $s->bag_no }}" data-category="{{ $s->category }}" data-size="{{ $s->size }}" data-nwt="{{ number_format($s->nwt,2) }}">
         <td style="color:#aaa">{{ $i+1 }}</td>
         <td><strong>{{ $s->bag_no }}</strong></td>
-        <td class="{{ $category === 'BAG' ? 'editable-nwt' : '' }}" data-stock-id="{{ $s->id }}">{{ number_format($s->nwt,2) }}</td>
+        <td class="{{ $isEditableValue ? 'editable-nwt' : '' }}" data-stock-id="{{ $s->id }}" @if($isEditableValue) title="Click to edit" @endif>{{ number_format($s->nwt,2) }}</td>
         <td><span class="badge-qty {{ $s->quantity==0?'zero':'' }}">{{ $s->quantity }}</span></td>
         @if($canManageStock)
           <td>

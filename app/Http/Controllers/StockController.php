@@ -127,6 +127,11 @@ class StockController extends Controller
 
         $oldNwt = $stock->nwt;
         $newNwt = (float) $request->nwt;
+        $valueLabel = match (strtolower((string) $stock->category)) {
+            'bnd' => 'Bundle',
+            'sqf' => 'Square Fit',
+            default => 'NWT',
+        };
 
         DB::transaction(function () use ($stock, $newNwt, $oldNwt) {
             $stock->update(['nwt' => $newNwt]);
@@ -141,14 +146,14 @@ class StockController extends Controller
                 'quantity_changed' => 0,
                 'quantity_before' => $stock->quantity,
                 'quantity_after' => $stock->quantity,
-                'note' => "NWT updated from " . number_format($oldNwt, 2) . " to " . number_format($newNwt, 2),
+                'note' => "{$valueLabel} updated from " . number_format($oldNwt, 2) . " to " . number_format($newNwt, 2),
                 'logged_at' => now(),
             ]);
         });
 
         return response()->json([
             'success' => true,
-            'message' => "Item #{$stock->bag_no} NWT updated to {$newNwt}",
+            'message' => "Item #{$stock->bag_no} {$valueLabel} updated to {$newNwt}",
             'new_nwt' => $newNwt,
         ]);
     }
